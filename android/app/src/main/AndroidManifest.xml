@@ -1,4 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-sdk tools:overrideLibrary="com.google.firebase, com.google.firebase.measurement, com.google.firebase.measurement_impl, com.google.firebase.common, com.google.firebase.components, com.google.firebase.concurrent, com.google.firebase.installations, com.google.firebase.installations.interop, com.google.firebase.firebase_analytics, com.google.firebase.analytics, com.google.firebase.analytics.connector, com.google.android.gms, com.google.android.gms.common, com.google.android.gms.base, com.google.android.gms.measurement, com.google.android.gms.measurement_impl, com.google.android.gms.measurement_base, com.google.android.gms.measurement_sdk, com.google.android.gms.measurement_sdk_api, com.google.android.gms.measurement.api, com.google.android.gms.measurement.base, com.google.android.gms.measurement.sdk, com.google.android.gms.measurement.sdk.api, com.google.android.gms.measurement.impl, com.google.android.gms.tasks, com.google.firebase.datatransport, io.flutter.plugins.firebase.analytics, io.flutter.plugins.firebase.core" />
+
     <!-- Saving the catalog PDF into the public Downloads folder.
          Android 10+ uses scoped storage and does not need this. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
@@ -29,6 +32,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- UCropActivity required by image_cropper plugin -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

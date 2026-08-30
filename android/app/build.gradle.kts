@@ -15,12 +15,12 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.ashish.qr_scanner"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.ashish.qr_scanner"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

@@ -53,6 +53,17 @@ class PdfExportService {
 
     final currency = profile.currency.trim().isEmpty ? '₹' : profile.currency;
 
+    // Build category map
+    final Map<int, String> categoryMap = {};
+    for (final prod in products) {
+      final catName = categoryNames?[prod.categoryId];
+      if (catName != null && catName.trim().isNotEmpty) {
+        categoryMap[prod.categoryId] = catName.trim();
+      } else {
+        categoryMap[prod.categoryId] = 'Category ${prod.categoryId}';
+      }
+    }
+
     // --- PAGE 1: COVER PAGE ---
     pdf.addPage(_buildCoverPage(
       profile: profile,
@@ -62,12 +73,21 @@ class PdfExportService {
       productCount: products.length,
     ));
 
-    // --- PAGES 2 ONWARD: PRODUCT GRID PAGES ---
+    // --- PAGE 2: TABLE OF CONTENTS (Categories Overview) ---
+    if (categoryMap.isNotEmpty) {
+      pdf.addPage(_buildTableOfContentsPage(
+        categoryMap: categoryMap,
+        fonts: fonts,
+        catalogName: catalogName,
+        profile: profile,
+      ));
+    }
+
+    // --- PAGES 3 ONWARD: PRODUCT GRID PAGES GROUPED BY CATEGORY ---
     final int cols = template.columns;
-    final List<List<Product>> productRows = [];
-    for (var i = 0; i < products.length; i += cols) {
-      productRows.add(products.sublist(
-          i, i + cols > products.length ? products.length : i + cols));
+    final Map<int, List<Product>> categoryProductsMap = {};
+    for (final prod in products) {
+      categoryProductsMap.putIfAbsent(prod.categoryId, () => []).add(prod);
     }
 
     pdf.addPage(
@@ -77,10 +97,60 @@ class PdfExportService {
         header: (context) => _buildRunningHeader(context, profile, fonts, logoImage),
         footer: (context) => _buildRunningFooter(profile, fonts),
         build: (pw.Context context) {
-          return [
-            pw.Column(
-              children: productRows.map((row) {
-                return pw.Row(
+          final widgets = <pw.Widget>[];
+
+          for (final entry in categoryProductsMap.entries) {
+            final catId = entry.key;
+            final catProds = entry.value;
+            final catName = categoryMap[catId] ?? 'Category $catId';
+
+            // Category Section Destination Anchor
+            widgets.add(
+              pw.Anchor(
+                name: 'cat_$catId',
+                child: pw.Container(
+                  width: double.infinity,
+                  margin: const pw.EdgeInsets.only(top: 8, bottom: 8),
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFFF1F5F9),
+                    borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        catName.toUpperCase(),
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 12,
+                          color: _emeraldGreen,
+                        ),
+                      ),
+                      pw.Text(
+                        '${catProds.length} items',
+                        style: pw.TextStyle(
+                          font: fonts.main,
+                          fontSize: 9,
+                          color: _slateText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            // Chunk products into rows for grid template
+            final List<List<Product>> rows = [];
+            for (var i = 0; i < catProds.length; i += cols) {
+              rows.add(catProds.sublist(
+                  i, i + cols > catProds.length ? catProds.length : i + cols));
+            }
+
+            for (final row in rows) {
+              widgets.add(
+                pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     for (final prod in row)
@@ -94,15 +164,18 @@ class PdfExportService {
                           productImage: productImages[prod.id],
                         ),
                       ),
-                    // Pad empty columns if row is not full
                     if (row.length < cols)
                       for (var k = 0; k < (cols - row.length); k++)
                         pw.Expanded(child: pw.Container()),
                   ],
-                );
-              }).toList(),
-            ),
-          ];
+                ),
+              );
+            }
+
+            widgets.add(pw.SizedBox(height: 10));
+          }
+
+          return widgets;
         },
       ),
     );
@@ -118,9 +191,6 @@ class PdfExportService {
   // LIST CATALOG
   // ---------------------------------------------------------------------
 
-  /// Builds a List-style catalog: same cover page, running header/footer and
-  /// terms page as the Grid catalogs, with the products rendered as a paginated
-  /// data table instead of a card grid.
   static Future<File> generateListCatalogPdf({
     required List<Product> products,
     required BusinessProfile profile,
@@ -131,21 +201,28 @@ class PdfExportService {
   }) async {
     final pdf = pw.Document();
 
-    // 1. Same embedded Poppins setup as the Grid catalogs
     final fonts = await _loadFonts();
 
-    // 2. Lookup matching ListCatalogTemplate implementation
     final template = templateId.startsWith('list_')
         ? ListTemplateRegistry.getTemplate(templateId)
         : ListTemplateRegistry.getTemplateByStyleId(styleId);
 
-    // 3. Pre-load business logo + product images
     final logoImage = await _loadLogoImage(profile);
     final productImages = await _loadProductImages(products);
 
     final currency = profile.currency.trim().isEmpty ? '₹' : profile.currency;
 
-    // --- PAGE 1: COVER PAGE (shared with Grid) ---
+    final Map<int, String> categoryMap = {};
+    for (final prod in products) {
+      final catName = categoryNames?[prod.categoryId];
+      if (catName != null && catName.trim().isNotEmpty) {
+        categoryMap[prod.categoryId] = catName.trim();
+      } else {
+        categoryMap[prod.categoryId] = 'Category ${prod.categoryId}';
+      }
+    }
+
+    // --- PAGE 1: COVER PAGE ---
     pdf.addPage(_buildCoverPage(
       profile: profile,
       fonts: fonts,
@@ -154,8 +231,17 @@ class PdfExportService {
       productCount: products.length,
     ));
 
-    // --- PAGES 2 ONWARD: THE TABLE ---
-    // Header row repeats automatically at the top of every overflow page.
+    // --- PAGE 2: TABLE OF CONTENTS ---
+    if (categoryMap.isNotEmpty) {
+      pdf.addPage(_buildTableOfContentsPage(
+        categoryMap: categoryMap,
+        fonts: fonts,
+        catalogName: catalogName,
+        profile: profile,
+      ));
+    }
+
+    // --- PAGES 3 ONWARD: THE TABLE ---
     final headerRow = pw.TableRow(
       repeat: true,
       decoration: ListTemplateStyle.headerDecoration,
@@ -171,23 +257,56 @@ class PdfExportService {
       ],
     );
 
-    final bodyRows = <pw.TableRow>[];
-    for (var i = 0; i < products.length; i++) {
-      final prod = products[i];
-      bodyRows.add(
-        template.buildProductRow(
-          serialNumber: i + 1,
-          product: prod,
-          currencySymbol: currency,
-          mainFont: fonts.main,
-          boldFont: fonts.bold,
-          categoryName: categoryNames?[prod.categoryId],
-          productImage: productImages[prod.id],
-        ),
-      );
+    final Map<int, List<Product>> categoryProductsMap = {};
+    for (final prod in products) {
+      categoryProductsMap.putIfAbsent(prod.categoryId, () => []).add(prod);
     }
 
-    // Only WithTotalSummaryTemplate contributes an aggregate row.
+    final bodyRows = <pw.TableRow>[];
+    int serialCounter = 1;
+
+    for (final entry in categoryProductsMap.entries) {
+      final catId = entry.key;
+      final catProds = entry.value;
+      final catName = categoryMap[catId] ?? 'Category $catId';
+
+      // Section Category Row with Anchor
+      bodyRows.add(
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF1F5F9)),
+          children: [
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              child: pw.Anchor(
+                name: 'cat_$catId',
+                child: pw.Text(
+                  catName.toUpperCase(),
+                  style: pw.TextStyle(font: fonts.bold, fontSize: 11, color: _emeraldGreen),
+                ),
+              ),
+            ),
+            for (var c = 1; c < template.columnHeaders.length; c++)
+              pw.Container(padding: const pw.EdgeInsets.all(4)),
+          ],
+        ),
+      );
+
+      for (var i = 0; i < catProds.length; i++) {
+        final prod = catProds[i];
+        bodyRows.add(
+          template.buildProductRow(
+            serialNumber: serialCounter++,
+            product: prod,
+            currencySymbol: currency,
+            mainFont: fonts.main,
+            boldFont: fonts.bold,
+            categoryName: categoryNames?[prod.categoryId],
+            productImage: productImages[prod.id],
+          ),
+        );
+      }
+    }
+
     if (template.hasTotalRow) {
       final totalRow = template.buildTotalRow(
         products: products,
@@ -206,54 +325,19 @@ class PdfExportService {
         footer: (context) => _buildRunningFooter(profile, fonts),
         build: (pw.Context context) {
           return [
-            // Catalog title strip above the table
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.end,
+            pw.Table(
+              columnWidths: template.columnWidths,
+              border: const pw.TableBorder(bottom: pw.BorderSide(color: _divider)),
               children: [
-                pw.Text(
-                  catalogName,
-                  style: pw.TextStyle(
-                    font: fonts.bold,
-                    fontSize: 13,
-                    color: _darkText,
-                  ),
-                ),
-                // GSTIN sits next to the table header for the GST template only
-                if (template.showsGstin && profile.gstin.trim().isNotEmpty)
-                  pw.Text(
-                    'GSTIN: ${profile.gstin}',
-                    style: pw.TextStyle(
-                      font: fonts.bold,
-                      fontSize: 9,
-                      color: _emeraldGreen,
-                    ),
-                  ),
+                headerRow,
+                ...bodyRows,
               ],
             ),
-            pw.SizedBox(height: 8),
-
-            if (products.isEmpty)
-              pw.Container(
-                padding: const pw.EdgeInsets.all(24),
-                alignment: pw.Alignment.center,
-                child: pw.Text(
-                  'No products in this catalog.',
-                  style: pw.TextStyle(font: fonts.main, fontSize: 11, color: _mutedText),
-                ),
-              )
-            else
-              pw.Table(
-                columnWidths: template.columnWidths,
-                defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
-                children: [headerRow, ...bodyRows],
-              ),
           ];
         },
       ),
     );
 
-    // --- LAST PAGE: TERMS & CONDITIONS (shared with Grid) ---
     final termsPage = _buildTermsPage(profile: profile, fonts: fonts);
     if (termsPage != null) pdf.addPage(termsPage);
 
@@ -261,26 +345,22 @@ class PdfExportService {
   }
 
   // ---------------------------------------------------------------------
-  // SHARED BUILDING BLOCKS (used by both Grid and List generation)
+  // HELPERS
   // ---------------------------------------------------------------------
 
   static Future<_PdfFonts> _loadFonts() async {
-    try {
-      return _PdfFonts(
-        await PdfGoogleFonts.poppinsRegular(),
-        await PdfGoogleFonts.poppinsBold(),
-      );
-    } catch (_) {
-      return _PdfFonts(pw.Font.helvetica(), pw.Font.helveticaBold());
-    }
+    final main = await PdfGoogleFonts.poppinsRegular();
+    final bold = await PdfGoogleFonts.poppinsBold();
+    return _PdfFonts(main, bold);
   }
 
   static Future<pw.MemoryImage?> _loadLogoImage(BusinessProfile profile) async {
-    if (profile.logoPath == null || profile.logoPath!.trim().isEmpty) return null;
-    final logoFile = File(profile.logoPath!);
-    if (!await logoFile.exists()) return null;
+    if (profile.logoPath == null) return null;
+    final file = File(profile.logoPath!);
+    if (!await file.exists()) return null;
     try {
-      return pw.MemoryImage(await logoFile.readAsBytes());
+      final bytes = await file.readAsBytes();
+      return pw.MemoryImage(bytes);
     } catch (_) {
       return null;
     }
@@ -288,13 +368,14 @@ class PdfExportService {
 
   static Future<Map<int, pw.MemoryImage>> _loadProductImages(
       List<Product> products) async {
-    final Map<int, pw.MemoryImage> images = {};
+    final images = <int, pw.MemoryImage>{};
     for (final prod in products) {
-      if (prod.imagePath == null || prod.imagePath!.trim().isEmpty) continue;
-      final imgFile = File(prod.imagePath!);
-      if (!await imgFile.exists()) continue;
+      if (prod.imagePath == null) continue;
+      final file = File(prod.imagePath!);
+      if (!await file.exists()) continue;
       try {
-        images[prod.id] = pw.MemoryImage(await imgFile.readAsBytes());
+        final bytes = await file.readAsBytes();
+        images[prod.id] = pw.MemoryImage(bytes);
       } catch (_) {}
     }
     return images;
@@ -317,7 +398,6 @@ class PdfExportService {
           children: [
             pw.Spacer(),
 
-            // Logo (Centered, top)
             if (logoImage != null)
               pw.Container(
                 width: 100,
@@ -343,7 +423,6 @@ class PdfExportService {
                 ),
               ),
 
-            // Business Name
             pw.Text(
               profile.businessName.toUpperCase(),
               textAlign: pw.TextAlign.center,
@@ -356,7 +435,6 @@ class PdfExportService {
 
             pw.SizedBox(height: 10),
 
-            // Address, Phone, Email, Website
             if (profile.address.trim().isNotEmpty)
               pw.Text(
                 profile.address,
@@ -405,7 +483,6 @@ class PdfExportService {
             pw.Container(width: 80, height: 2, color: _warmGold),
             pw.SizedBox(height: 20),
 
-            // Catalog Title / Subtitle
             pw.Text(
               catalogName.toUpperCase(),
               style: pw.TextStyle(
@@ -426,13 +503,157 @@ class PdfExportService {
 
             pw.Spacer(),
 
-            // Date Generated
             pw.Text(
               'Generated on: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
               style:
                   pw.TextStyle(font: fonts.main, fontSize: 9, color: _mutedText),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  static pw.Page _buildTableOfContentsPage({
+    required Map<int, String> categoryMap,
+    required _PdfFonts fonts,
+    required String catalogName,
+    required BusinessProfile profile,
+  }) {
+    return pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(36),
+      build: (pw.Context context) {
+        final entries = categoryMap.entries.toList();
+        return pw.Anchor(
+          name: 'toc_page',
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'TABLE OF CONTENTS',
+                        style: pw.TextStyle(
+                          font: fonts.bold,
+                          fontSize: 18,
+                          color: _emeraldGreen,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Click on any category to jump directly to its products',
+                        style: pw.TextStyle(
+                          font: fonts.main,
+                          fontSize: 10,
+                          color: _slateText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Text(
+                    profile.businessName,
+                    style: pw.TextStyle(
+                      font: fonts.bold,
+                      fontSize: 11,
+                      color: _warmGold,
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Container(height: 1.5, color: _emeraldGreen),
+              pw.SizedBox(height: 20),
+
+              pw.Expanded(
+                child: pw.ListView.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (ctx, index) {
+                    final catId = entries[index].key;
+                    final catName = entries[index].value;
+                    return pw.Container(
+                      margin: const pw.EdgeInsets.only(bottom: 10),
+                      child: pw.Link(
+                        destination: 'cat_$catId',
+                        child: pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: pw.BoxDecoration(
+                            color: const PdfColor.fromInt(0xFFF8FAFC),
+                            borderRadius: pw.BorderRadius.circular(8),
+                            border: pw.Border.all(color: const PdfColor.fromInt(0xFFCBD5E1), width: 1),
+                          ),
+                          child: pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Row(
+                                children: [
+                                  pw.Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: const pw.BoxDecoration(
+                                      color: PdfColor.fromInt(0xFFECFDF5),
+                                      shape: pw.BoxShape.circle,
+                                    ),
+                                    child: pw.Center(
+                                      child: pw.Text(
+                                        '${index + 1}',
+                                        style: pw.TextStyle(font: fonts.bold, fontSize: 10, color: _emeraldGreen),
+                                      ),
+                                    ),
+                                  ),
+                                  pw.SizedBox(width: 12),
+                                  pw.Text(
+                                    catName,
+                                    style: pw.TextStyle(
+                                      font: fonts.bold,
+                                      fontSize: 13,
+                                      color: _darkText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              pw.Text(
+                                'Go to section  ➜',
+                                style: pw.TextStyle(
+                                  font: fonts.bold,
+                                  fontSize: 10,
+                                  color: _emeraldGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: const PdfColor.fromInt(0xFFFEF3C7),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Row(
+                  children: [
+                    pw.Text(
+                      'Tip: ',
+                      style: pw.TextStyle(font: fonts.bold, fontSize: 9, color: const PdfColor.fromInt(0xFF92400E)),
+                    ),
+                    pw.Text(
+                      'Tap the "TOC 🏠" button on the top right of any page to return here.',
+                      style: pw.TextStyle(font: fonts.main, fontSize: 9, color: const PdfColor.fromInt(0xFF92400E)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -469,10 +690,39 @@ class PdfExportService {
               ),
             ],
           ),
-          pw.Text(
-            'Page ${context.pageNumber} of ${context.pagesCount}',
-            style: pw.TextStyle(
-                font: fonts.main, fontSize: 9, color: _slateText),
+          pw.Row(
+            children: [
+              pw.Link(
+                destination: 'toc_page',
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: const PdfColor.fromInt(0xFFECFDF5),
+                    borderRadius: pw.BorderRadius.circular(4),
+                    border: pw.Border.all(color: const PdfColor.fromInt(0xFFA7F3D0)),
+                  ),
+                  child: pw.Row(
+                    mainAxisSize: pw.MainAxisSize.min,
+                    children: [
+                      pw.Text(
+                        'TOC ',
+                        style: pw.TextStyle(font: fonts.bold, fontSize: 8, color: _emeraldGreen),
+                      ),
+                      pw.Text(
+                        '🏠',
+                        style: pw.TextStyle(font: fonts.main, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount}',
+                style: pw.TextStyle(
+                    font: fonts.main, fontSize: 9, color: _slateText),
+              ),
+            ],
           ),
         ],
       ),
@@ -492,7 +742,6 @@ class PdfExportService {
     );
   }
 
-  /// Returns null when the profile has no terms, so callers can skip the page.
   static pw.Page? _buildTermsPage({
     required BusinessProfile profile,
     required _PdfFonts fonts,
@@ -530,7 +779,6 @@ class PdfExportService {
 
             pw.Spacer(),
 
-            // Contact Call To Action Box
             pw.Container(
               width: double.infinity,
               padding: const pw.EdgeInsets.all(16),
@@ -583,14 +831,6 @@ class PdfExportService {
     return file;
   }
 
-
-  /// Copies a generated catalog PDF out of the app's temp folder into a
-  /// user-visible location and returns the saved file.
-  ///
-  /// Tries the public Downloads folder first; if scoped storage blocks that,
-  /// it falls back to external app storage and finally to app documents, so
-  /// the save never silently fails. Read the returned file's path to tell the
-  /// user where it actually landed.
   static Future<File> savePdfToDevice(File pdfFile, String catalogName) async {
     final bytes = await pdfFile.readAsBytes();
     final trimmed = catalogName.trim();
@@ -611,14 +851,12 @@ class PdfExportService {
       }
     }
 
-    // Should be unreachable: app documents is always writable.
     final fallback = await getApplicationDocumentsDirectory();
     final target = File('${fallback.path}/$fileName');
     await target.writeAsBytes(bytes, flush: true);
     return target;
   }
 
-  /// Candidate save locations, most user-visible first.
   static Future<List<Directory>> _saveTargets() async {
     final targets = <Directory>[];
 

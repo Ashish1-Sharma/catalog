@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../core/services/product_image_service.dart';
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
+import '../../services/analytics_service.dart';
 
 class AddEditProductScreen extends ConsumerStatefulWidget {
   final Product? product;
@@ -38,6 +40,10 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     super.initState();
     if (widget.product != null) {
       final p = widget.product!;
+      AnalyticsService.instance.logProductViewed(
+        productId: p.id.toString(),
+        productName: p.name,
+      );
       _selectedCategoryId = p.categoryId;
       _nameController.text = p.name;
       _mrpController.text = p.mrp > 0 ? p.mrp.toString() : '';
@@ -52,9 +58,11 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
       _descLength = p.description?.length ?? 0;
     }
     _descriptionController.addListener(() {
-      setState(() {
-        _descLength = _descriptionController.text.length;
-      });
+      if (mounted) {
+        setState(() {
+          _descLength = _descriptionController.text.length;
+        });
+      }
     });
     _refreshImagePathFromDb();
   }
@@ -89,30 +97,150 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final img = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 90,
-    );
-    if (img == null) return;
+  Future<String?> _cropImage(String sourcePath) async {
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: sourcePath,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Product Image',
+            toolbarColor: const Color(0xFF045435),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
+            lockAspectRatio: true,
+            hideBottomControls: false,
+          ),
+          IOSUiSettings(
+            title: 'Crop Product Image',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            aspectRatioPickerButtonHidden: true,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
+          ),
+        ],
+      );
+      return croppedFile?.path ?? sourcePath;
+    } catch (e) {
+      debugPrint('Cropping failed, fallback to original image: $e');
+      return sourcePath;
+    }
+  }
 
-    // image_picker returns a cache path the OS can purge. Copy it into
-    // permanent storage before it ever reaches the database.
-    final persistedPath = await ProductImageService.persist(img.path);
-    if (!mounted) return;
-    setState(() {
-      _imagePath = persistedPath;
-    });
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final img = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 90,
+      );
+      if (img == null) return;
+
+      final croppedPath = await _cropImage(img.path);
+      if (croppedPath == null) return;
+
+      final persistedPath = await ProductImageService.persist(croppedPath);
+      if (!mounted) return;
+      setState(() {
+        _imagePath = persistedPath;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not pick or crop image: $e')),
+      );
+    }
+  }
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Select Product Image',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFECFDF5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_outlined, color: Color(0xFF045435)),
+                ),
+                title: const Text('Upload from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Select a photo from your device gallery', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFECFDF5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF045435)),
+                ),
+                title: const Text('Upload from Camera', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Take a new photo with camera', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_imagePath == null || !File(_imagePath!).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product image is required. Please select an image.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
+        const SnackBar(
+          content: Text('Please select a category'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -133,9 +261,6 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
     try {
       if (widget.product != null) {
-        // Base the update on the CURRENT row, not the (possibly stale) copy
-        // this screen was constructed with — otherwise saving would write an
-        // old image path back over one the repair pass already fixed.
         final base = await repo.getProductById(widget.product!.id) ?? widget.product!;
         final updated = base.copyWith(
           categoryId: _selectedCategoryId!,
@@ -167,6 +292,10 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           description: drift.Value(description.isEmpty ? null : description),
         );
         await repo.addProduct(companion);
+        await AnalyticsService.instance.logProductCreated(
+          productName: name,
+          categoryId: _selectedCategoryId?.toString(),
+        );
       }
 
       ref.invalidate(productsProvider);
@@ -174,7 +303,6 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
       setState(() => _isLoading = false);
       context.pop();
     } catch (e) {
-      // Without this the spinner stayed on forever and the save looked "stuck".
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,7 +341,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
             ),
             const SizedBox(height: 2),
             const Text(
-              'Add detailed information about your product',
+              'Add product image, category, name and optional details',
               style: TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 11,
@@ -222,16 +350,6 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF64748B)),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Fill in product details and save to add to catalog.')),
-              );
-            },
-          ),
-        ],
       ),
       body: categoriesAsync.when(
         data: (categories) {
@@ -269,6 +387,8 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
             _selectedCategoryId = categories.first.id;
           }
 
+          final hasValidImage = _imagePath != null && File(_imagePath!).existsSync();
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Form(
@@ -276,24 +396,37 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image Picker Card
+                  // Image Picker Label (Mandatory)
+                  _buildLabel('Product Image', isRequired: true),
+                  const SizedBox(height: 8),
+
+                  // Image Picker Card with 1:1 Preview
                   GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _showImageSourcePicker,
                     child: Container(
                       width: double.infinity,
-                      height: 140,
+                      height: 180,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+                        border: Border.all(
+                          color: hasValidImage ? primaryGreen : const Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
                       ),
-                      child: _imagePath != null && File(_imagePath!).existsSync()
+                      child: hasValidImage
                           ? Stack(
                               alignment: Alignment.center,
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
-                                  child: Image.file(File(_imagePath!), fit: BoxFit.cover, width: double.infinity, height: 140),
+                                  child: AspectRatio(
+                                    aspectRatio: 1,
+                                    child: Image.file(
+                                      File(_imagePath!),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -324,12 +457,12 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                                   child: const Icon(
                                     Icons.add_a_photo_outlined,
                                     color: Color(0xFF059669),
-                                    size: 26,
+                                    size: 28,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 const Text(
-                                  'Add Product Image',
+                                  'Add Product Image (Required)',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -338,7 +471,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 const Text(
-                                  'JPG, PNG up to 5MB',
+                                  'Tap to choose from Gallery or Camera',
                                   style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                                 ),
                               ],
@@ -348,7 +481,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
                   const SizedBox(height: 20),
 
-                  // 1. Category Dropdown
+                  // 1. Category Dropdown (Mandatory)
                   _buildLabel('Category', isRequired: true),
                   const SizedBox(height: 6),
                   Container(
@@ -391,33 +524,32 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 2. Product Name Field
+                  // 2. Product Name Field (Mandatory)
                   _buildLabel('Product Name', isRequired: true),
                   const SizedBox(height: 6),
                   _buildIconInputField(
                     icon: Icons.shopping_bag_outlined,
                     hintText: 'Enter product name',
                     controller: _nameController,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                    validator: (val) => val == null || val.trim().isEmpty ? 'Product name is required' : null,
                   ),
 
                   const SizedBox(height: 16),
 
-                  // 3. MRP (₹) & Sale Price (₹) Row
+                  // 3. MRP (₹) & Sale Price (₹) Row (Optional)
                   Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('MRP (₹)', isRequired: true),
+                            _buildLabel('MRP (₹)', isRequired: false),
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.currency_rupee_rounded,
-                              hintText: 'Enter MRP',
+                              hintText: 'e.g. 999 (Optional)',
                               controller: _mrpController,
                               keyboardType: TextInputType.number,
-                              validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
                             ),
                           ],
                         ),
@@ -427,14 +559,13 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('Sale Price (₹)', isRequired: true),
+                            _buildLabel('Sale Price (₹)', isRequired: false),
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.local_offer_outlined,
-                              hintText: 'Enter sale price',
+                              hintText: 'e.g. 799 (Optional)',
                               controller: _salePriceController,
                               keyboardType: TextInputType.number,
-                              validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
                             ),
                           ],
                         ),
@@ -444,7 +575,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 4. Discount (%) & Quantity / MOQ Row
+                  // 4. Discount (%) & Quantity / MOQ Row (Optional)
                   Row(
                     children: [
                       Expanded(
@@ -455,7 +586,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.percent_rounded,
-                              hintText: 'Enter discount',
+                              hintText: 'e.g. 20 (Optional)',
                               controller: _discountController,
                               keyboardType: TextInputType.number,
                             ),
@@ -467,11 +598,11 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildLabel('Quantity / MOQ', isRequired: true),
+                            _buildLabel('Quantity / MOQ', isRequired: false),
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.inventory_2_outlined,
-                              hintText: 'Enter quantity or MOQ',
+                              hintText: 'e.g. 10 pcs (Optional)',
                               controller: _quantityController,
                             ),
                           ],
@@ -482,7 +613,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 5. Size & Colour Row
+                  // 5. Size & Colour Row (Optional)
                   Row(
                     children: [
                       Expanded(
@@ -493,7 +624,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.straighten_rounded,
-                              hintText: 'Enter size',
+                              hintText: 'e.g. M, L, XL (Optional)',
                               controller: _sizeController,
                             ),
                           ],
@@ -508,7 +639,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                             const SizedBox(height: 6),
                             _buildIconInputField(
                               icon: Icons.palette_outlined,
-                              hintText: 'Enter colour',
+                              hintText: 'e.g. Red, Blue (Optional)',
                               controller: _colourController,
                             ),
                           ],
@@ -519,19 +650,19 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 6. GST (%) — optional, used by the "With GST" list template
+                  // 6. GST (%) (Optional)
                   _buildLabel('GST (%)', isRequired: false),
                   const SizedBox(height: 6),
                   _buildIconInputField(
                     icon: Icons.receipt_long_outlined,
-                    hintText: 'e.g. 18 (shown on GST catalogs)',
+                    hintText: 'e.g. 18 (Optional)',
                     controller: _gstPercentController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // 7. Description Text Area
+                  // 7. Description (Optional)
                   _buildLabel('Description', isRequired: false),
                   const SizedBox(height: 6),
                   Container(
@@ -558,11 +689,11 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _descriptionController,
-                                maxLines: 4,
+                                maxLines: 3,
                                 maxLength: 500,
                                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                                 decoration: const InputDecoration(
-                                  hintText: 'Enter product description',
+                                  hintText: 'Enter product description (Optional)',
                                   hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
@@ -584,71 +715,9 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 28),
 
-                  // 8. Tip Card
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFDCFCE7), width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.verified_user_outlined,
-                            color: Color(0xFF059669),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tip',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF065F46),
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Provide accurate details to help customers understand your product better.',
-                                style: TextStyle(fontSize: 11, color: Color(0xFF047857), height: 1.2),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFDCFCE7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.inventory_2_rounded,
-                            color: Color(0xFF059669),
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 9. Save Product Button
+                  // Save Product Button
                   SizedBox(
                     width: double.infinity,
                     height: 52,

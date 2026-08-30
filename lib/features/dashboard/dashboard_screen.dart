@@ -251,41 +251,41 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              const SizedBox(height: 30),
-
-              // Box Illustration & Headline
-              Center(
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/catalog_box_illustration.jpg',
-                      height: 190,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox(height: 100),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Everything you need to\ncreate amazing catalogs',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: 32,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: primaryGreen,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // const SizedBox(height: 30),
+              //
+              // // Box Illustration & Headline
+              // Center(
+              //   child: Column(
+              //     children: [
+              //       Image.asset(
+              //         'assets/catalog_box_illustration.jpg',
+              //         height: 190,
+              //         fit: BoxFit.contain,
+              //         errorBuilder: (context, error, stackTrace) => const SizedBox(height: 100),
+              //       ),
+              //       const SizedBox(height: 12),
+              //       const Text(
+              //         'Everything you need to\ncreate amazing catalogs',
+              //         textAlign: TextAlign.center,
+              //         style: TextStyle(
+              //           fontSize: 16,
+              //           fontWeight: FontWeight.bold,
+              //           color: Color(0xFF1E293B),
+              //           height: 1.3,
+              //         ),
+              //       ),
+              //       const SizedBox(height: 10),
+              //       Container(
+              //         width: 32,
+              //         height: 3,
+              //         decoration: BoxDecoration(
+              //           color: primaryGreen,
+              //           borderRadius: BorderRadius.circular(2),
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ),
 
               const SizedBox(height: 30),
             ],

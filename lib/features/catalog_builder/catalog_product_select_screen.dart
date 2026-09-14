@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/utils/currency_utils.dart';
-import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/catalog_builder_provider.dart';
 
@@ -39,27 +38,13 @@ class _CatalogProductSelectScreenState extends ConsumerState<CatalogProductSelec
           icon: const Icon(Icons.arrow_back_rounded, color: primaryPurple),
           onPressed: () => context.pop(),
         ),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Create Catalog',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              'Step 2 of 3',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Select Products',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         actions: [
           IconButton(
@@ -139,23 +124,6 @@ class _CatalogProductSelectScreenState extends ConsumerState<CatalogProductSelec
           final selectedIds = builderState.selectedProductIds;
           final isAllSelected = selectedIds.length == categoryFiltered.length && categoryFiltered.isNotEmpty;
 
-          // Calculate total price of selected items
-          double totalPrice = 0.0;
-          for (final id in selectedIds) {
-            final match = allProducts.firstWhere(
-              (p) => p.id == id,
-              orElse: () => Product(
-                id: 0,
-                categoryId: 0,
-                name: '',
-                mrp: 0,
-                salePrice: 0,
-                createdAt: DateTime.now(),
-              ),
-            );
-            totalPrice += match.salePrice;
-          }
-
           return Column(
             children: [
               Expanded(
@@ -164,11 +132,6 @@ class _CatalogProductSelectScreenState extends ConsumerState<CatalogProductSelec
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 3-Step Stepper Bar
-                      _buildStepperHeader(),
-
-                      const SizedBox(height: 20),
-
                       // Search Bar & Filter Button Row
                       Row(
                         children: [
@@ -451,25 +414,15 @@ class _CatalogProductSelectScreenState extends ConsumerState<CatalogProductSelec
                     ),
                     const SizedBox(width: 10),
 
-                    // Price Total Summary
+                    // Selected Count (Price Total Removed)
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'selected',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                          ),
-                          Text(
-                            '${CurrencyUtils.formatAmount(totalPrice, currency: currency)} (Total)',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        '${selectedIds.length} items selected',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
 
@@ -514,115 +467,6 @@ class _CatalogProductSelectScreenState extends ConsumerState<CatalogProductSelec
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text('Error: $e')),
       ),
-    );
-  }
-
-  Widget _buildStepperHeader() {
-    const activeColor = Color(0xFF6366F1);
-    const inactiveColor = Color(0xFFE2E8F0);
-    const textInactive = Color(0xFF94A3B8);
-
-    return Row(
-      children: [
-        // Step 1 Completed
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Categories',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 1-2 (Active Purple)
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: activeColor,
-          ),
-        ),
-
-        // Step 2 Active
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '2',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Products',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 2-3 (Inactive)
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: inactiveColor,
-          ),
-        ),
-
-        // Step 3 Inactive
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: inactiveColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '3',
-                    style: TextStyle(color: textInactive, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Review & Create',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textInactive),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,8 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
+import '../../services/analytics_service.dart';
 
 class CategoryListScreen extends ConsumerStatefulWidget {
   const CategoryListScreen({super.key});
@@ -12,24 +14,64 @@ class CategoryListScreen extends ConsumerStatefulWidget {
 }
 
 class _CategoryListScreenState extends ConsumerState<CategoryListScreen> {
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _addCategoryController = TextEditingController();
+  bool _isAdding = false;
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _addCategoryController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleAddCategories() async {
+    final rawInput = _addCategoryController.text.trim();
+    if (rawInput.isEmpty) return;
+
+    final names = rawInput
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (names.isEmpty) return;
+
+    setState(() => _isAdding = true);
+    try {
+      final repo = ref.read(categoryRepoProvider);
+      final existingCategories = await repo.getCategories();
+      int currentSortOrder = existingCategories.length;
+
+      for (final catName in names) {
+        final companion = CategoriesCompanion(
+          name: Value(catName),
+          sortOrder: Value(currentSortOrder),
+        );
+        await repo.addCategory(companion);
+        AnalyticsService.instance.logCategoryCreated(categoryName: catName);
+        currentSortOrder++;
+      }
+
+      _addCategoryController.clear();
+      ref.invalidate(categoriesProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not add category: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final productsAsync = ref.watch(productsProvider);
-    const primaryPurple = Color(0xFF6366F1);
 
     const primaryGreen = Color(0xFF045435);
-    const lightGreenBg = Color(0xFFECFDF5);
-    const greenBorderColor = Color(0xFFD1FAE5);
     const textDarkColor = Color(0xFF1E293B);
 
     // Compute product count map per category
@@ -41,300 +83,248 @@ class _CategoryListScreenState extends ConsumerState<CategoryListScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        backgroundColor: primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: textDarkColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
           onPressed: () => context.pop(),
         ),
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Search categories...',
-                  hintStyle: TextStyle(color: Colors.white70),
-                  border: InputBorder.none,
-                ),
-                onChanged: (_) => setState(() {}),
-              )
-            : const Text(
-                'Categories',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
-            onPressed: () {
-              setState(() {
-                if (_isSearching) {
-                  _searchController.clear();
-                }
-                _isSearching = !_isSearching;
-              });
-            },
+        title: const Text(
+          'Categories',
+          style: TextStyle(
+            color: textDarkColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
-          // IconButton(
-          //   icon: const Icon(Icons.add_rounded, size: 28),
-          //   onPressed: () => context.push('/add-category'),
-          // ),
-        ],
+        ),
+        centerTitle: false,
       ),
-      body: categoriesAsync.when(
-        data: (categories) {
-          final query = _searchController.text.trim().toLowerCase();
-          final filteredCategories = query.isEmpty
-              ? categories
-              : categories.where((c) => c.name.toLowerCase().contains(query)).toList();
-
-          if (categories.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.category_outlined, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No categories added yet.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+      body: Column(
+        children: [
+          // Top Inline Add Category Section
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _addCategoryController,
+                    onSubmitted: (_) => _handleAddCategories(),
+                    decoration: InputDecoration(
+                      hintText: 'Add category name(s)',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                      fillColor: Colors.white,
+                      filled: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: primaryGreen, width: 1.5),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add First Category'),
-                    onPressed: () => context.push('/add-category'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              // Reorder Guide Banner Box
-              Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: lightGreenBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: greenBorderColor, width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
-                        Icons.touch_app_outlined,
-                        color: Color(0xFF059669),
-                        size: 22,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Press and hold, then drag up or down\nto reorder the categories.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF065F46),
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Reorderable Category List
-              Expanded(
-                child: filteredCategories.isEmpty
-                    ? const Center(child: Text('No categories match search.'))
-                    : ReorderableListView.builder(
-                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-                        itemCount: filteredCategories.length,
-                        onReorder: (oldIndex, newIndex) async {
-                          if (query.isNotEmpty) return; // Disable reorder during search filter
-                          final list = List<Category>.from(categories);
-                          if (newIndex > oldIndex) newIndex -= 1;
-                          final item = list.removeAt(oldIndex);
-                          list.insert(newIndex, item);
-                          await ref.read(categoryRepoProvider).reorderCategories(list);
-                          ref.invalidate(categoriesProvider);
-                        },
-                        itemBuilder: (context, index) {
-                          final cat = filteredCategories[index];
-                          final count = productCountMap[cat.id] ?? 0;
-
-                          return Container(
-                            key: ValueKey(cat.id),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
+                    onPressed: _isAdding ? null : _handleAddCategories,
+                    child: _isAdding
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              child: Row(
+                          )
+                        : const Text(
+                            'Add',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Subtitle instruction for multiple categories
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 6, bottom: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF059669),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'To add multiple categories use , comma',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Categories List
+          Expanded(
+            child: categoriesAsync.when(
+              data: (categories) {
+                if (categories.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No categories added yet.',
+                      style: TextStyle(fontSize: 15, color: Color(0xFF94A3B8)),
+                    ),
+                  );
+                }
+
+                return ReorderableListView.builder(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
+                  itemCount: categories.length,
+                  onReorder: (oldIndex, newIndex) async {
+                    final list = List<Category>.from(categories);
+                    if (newIndex > oldIndex) newIndex -= 1;
+                    final item = list.removeAt(oldIndex);
+                    list.insert(newIndex, item);
+                    await ref.read(categoryRepoProvider).reorderCategories(list);
+                    ref.invalidate(categoriesProvider);
+                  },
+                  itemBuilder: (context, index) {
+                    final cat = categories[index];
+                    final count = productCountMap[cat.id] ?? 0;
+
+                    return Container(
+                      key: ValueKey(cat.id),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            // Category Title & Product count
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Drag indicator handle
-                                  ReorderableDragStartListener(
-                                    index: index,
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                      child: Icon(
-                                        Icons.drag_indicator_rounded,
-                                        color: Color(0xFF94A3B8),
-                                        size: 22,
-                                      ),
+                                  Text(
+                                    cat.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: textDarkColor,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-
-                                  // Category Icon circle (without logo as requested)
-                                  Container(
-                                    width: 46,
-                                    height: 46,
-                                    decoration: const BoxDecoration(
-                                      color: lightGreenBg,
-                                      shape: BoxShape.circle,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '$count products',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF64748B),
                                     ),
-                                    child: const Icon(
-                                      Icons.category_rounded,
-                                      color: Color(0xFF059669),
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-
-                                  // Category Title & Product count
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          cat.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: textDarkColor,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '$count products',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Edit Button
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit_rounded,
-                                      color: Color(0xFF059669),
-                                      size: 22,
-                                    ),
-                                    onPressed: () => context.push('/edit-category', extra: cat),
-                                  ),
-
-                                  // Delete Button
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                      color: Color(0xFFEF4444),
-                                      size: 22,
-                                    ),
-                                    onPressed: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Delete Category'),
-                                          content: Text('Are you sure you want to delete "${cat.name}"? Products in this category will also be deleted.'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(ctx, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(ctx, true),
-                                              child: const Text(
-                                                'Delete',
-                                                style: TextStyle(color: Colors.red),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirm == true) {
-                                        await ref.read(categoryRepoProvider).deleteCategory(cat.id);
-                                        ref.invalidate(categoriesProvider);
-                                        ref.invalidate(productsProvider);
-                                      }
-                                    },
                                   ),
                                 ],
                               ),
                             ),
-                          );
-                        },
+
+                            // Edit Button
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: Color(0xFF059669),
+                                size: 22,
+                              ),
+                              onPressed: () => context.push('/edit-category', extra: cat),
+                            ),
+
+                            // Delete Button
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Color(0xFFEF4444),
+                                size: 22,
+                              ),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Delete Category'),
+                                    content: Text(
+                                        'Are you sure you want to delete "${cat.name}"? Products in this category will also be deleted.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await ref.read(categoryRepoProvider).deleteCategory(cat.id);
+                                  ref.invalidate(categoriesProvider);
+                                  ref.invalidate(productsProvider);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error loading categories: $e')),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton(
-              backgroundColor: primaryPurple,
-              elevation: 4,
-              shape: const CircleBorder(),
-              onPressed: () => context.push('/add-category'),
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => Center(child: Text('Error loading categories: $e')),
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'Add Category',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: primaryPurple,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

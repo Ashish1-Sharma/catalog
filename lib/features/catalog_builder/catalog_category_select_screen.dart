@@ -14,16 +14,36 @@ class CatalogCategorySelectScreen extends ConsumerStatefulWidget {
 class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySelectScreen> {
   late TextEditingController _nameController;
 
+  String _generateAutoCatalogName() {
+    final now = DateTime.now();
+    final yyyy = now.year;
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    final hh = now.hour.toString().padLeft(2, '0');
+    final min = now.minute.toString().padLeft(2, '0');
+    final ss = now.second.toString().padLeft(2, '0');
+    final sb = StringBuffer('Catalog_')
+      ..write(yyyy)
+      ..write(mm)
+      ..write(dd)
+      ..write('_')
+      ..write(hh)
+      ..write(min)
+      ..write(ss);
+    return sb.toString();
+  }
+
   @override
   void initState() {
     super.initState();
     final builderState = ref.read(catalogBuilderProvider);
-    _nameController = TextEditingController(text: builderState.name.isEmpty ? 'My Catalog' : builderState.name);
-    if (builderState.name.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(catalogBuilderProvider.notifier).setName('My Catalog');
-      });
-    }
+    final autoName = (builderState.name.isEmpty || builderState.name == 'My Catalog')
+        ? _generateAutoCatalogName()
+        : builderState.name;
+    _nameController = TextEditingController(text: autoName);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(catalogBuilderProvider.notifier).setName(autoName);
+    });
   }
 
   @override
@@ -50,27 +70,13 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
           icon: const Icon(Icons.arrow_back_rounded, color: primaryGreen),
           onPressed: () => context.pop(),
         ),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Create Catalog',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              'Step 1 of 3',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Create Catalog',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         actions: [
           IconButton(
@@ -130,6 +136,7 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
           }
 
           final selectedIds = builderState.selectedCategoryIds;
+          final isAllSelected = selectedIds.length == allCategories.length && allCategories.isNotEmpty;
 
           return Column(
             children: [
@@ -139,11 +146,6 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 3-Step Stepper Bar
-                      _buildStepperHeader(),
-
-                      const SizedBox(height: 20),
-
                       // Catalog Name Input Field
                       const Row(
                         children: [
@@ -205,19 +207,60 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
 
                       const SizedBox(height: 20),
 
-                      // Section Title
-                      const Text(
-                        'Select categories to include',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Drag and drop to reorder the categories',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      // Section Title & Select All Option
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Select categories to include',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Drag and drop to reorder the categories',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () {
+                              if (isAllSelected) {
+                                notifier.setSelectedCategories([]);
+                              } else {
+                                notifier.setSelectedCategories(allCategories.map((c) => c.id).toList());
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    isAllSelected ? 'Deselect All' : 'Select All',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryGreen,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    isAllSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                    color: primaryGreen,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 14),
@@ -312,66 +355,66 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
                       const SizedBox(height: 16),
 
                       // Tip Banner Card Box
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF059669),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.info_outline_rounded,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Tip',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: Color(0xFF065F46),
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'You can select multiple categories and reorder them to set the display order.',
-                                    style: TextStyle(fontSize: 11, color: Color(0xFF047857), height: 1.3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFDCFCE7),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.folder_copy_rounded,
-                                color: Color(0xFF059669),
-                                size: 22,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
+                      // Container(
+                      //   padding: const EdgeInsets.all(14),
+                      //   decoration: BoxDecoration(
+                      //     color: const Color(0xFFF8FAFC),
+                      //     borderRadius: BorderRadius.circular(16),
+                      //     border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                      //   ),
+                      //   child: Row(
+                      //     children: [
+                      //       Container(
+                      //         padding: const EdgeInsets.all(8),
+                      //         decoration: const BoxDecoration(
+                      //           color: Color(0xFF059669),
+                      //           shape: BoxShape.circle,
+                      //         ),
+                      //         child: const Icon(
+                      //           Icons.info_outline_rounded,
+                      //           color: Colors.white,
+                      //           size: 18,
+                      //         ),
+                      //       ),
+                      //       const SizedBox(width: 12),
+                      //       const Expanded(
+                      //         child: Column(
+                      //           crossAxisAlignment: CrossAxisAlignment.start,
+                      //           children: [
+                      //             Text(
+                      //               'Tip',
+                      //               style: TextStyle(
+                      //                 fontWeight: FontWeight.bold,
+                      //                 fontSize: 13,
+                      //                 color: Color(0xFF065F46),
+                      //               ),
+                      //             ),
+                      //             SizedBox(height: 2),
+                      //             Text(
+                      //               'You can select multiple categories and reorder them to set the display order.',
+                      //               style: TextStyle(fontSize: 11, color: Color(0xFF047857), height: 1.3),
+                      //             ),
+                      //           ],
+                      //         ),
+                      //       ),
+                      //       const SizedBox(width: 8),
+                      //       Container(
+                      //         padding: const EdgeInsets.all(8),
+                      //         decoration: const BoxDecoration(
+                      //           color: Color(0xFFDCFCE7),
+                      //           shape: BoxShape.circle,
+                      //         ),
+                      //         child: const Icon(
+                      //           Icons.folder_copy_rounded,
+                      //           color: Color(0xFF059669),
+                      //           size: 22,
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
+                      //
+                      // const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -421,118 +464,6 @@ class _CatalogCategorySelectScreenState extends ConsumerState<CatalogCategorySel
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text('Error: $e')),
       ),
-    );
-  }
-
-  Widget _buildStepperHeader() {
-    const activeColor = Color(0xFF045435);
-    const inactiveColor = Color(0xFFE2E8F0);
-    const textInactive = Color(0xFF94A3B8);
-
-    return Row(
-      children: [
-        // Step 1 Active
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '1',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Categories',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 1-2
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: const Color(0xFF86EFAC),
-          ),
-        ),
-
-        // Step 2 Inactive
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: inactiveColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '2',
-                    style: TextStyle(color: textInactive, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Products',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textInactive),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 2-3
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: inactiveColor,
-          ),
-        ),
-
-        // Step 3 Inactive
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: inactiveColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '3',
-                    style: TextStyle(color: textInactive, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Review & Create',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textInactive),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

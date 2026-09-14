@@ -6,14 +6,20 @@ import '../../core/constants/app_constants.dart';
 class TrialDialog extends StatefulWidget {
   final int daysRemaining;
   final String? validityDateStr;
+  final bool isExpired;
 
   const TrialDialog({
     super.key,
     required this.daysRemaining,
     this.validityDateStr,
+    this.isExpired = false,
   });
 
-  static Future<void> showIfNeeded(BuildContext context, int daysRemaining) async {
+  static Future<void> showIfNeeded(
+    BuildContext context,
+    int daysRemaining, {
+    bool isExpired = false,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
 
     // Only free-trial users see this popup. `flag` comes from the auth
@@ -27,11 +33,15 @@ class TrialDialog extends StatefulWidget {
 
     return showDialog<void>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: !isExpired,
       builder: (BuildContext context) {
-        return TrialDialog(
-          daysRemaining: daysRemaining,
-          validityDateStr: validityDateStr,
+        return PopScope(
+          canPop: !isExpired,
+          child: TrialDialog(
+            daysRemaining: daysRemaining,
+            validityDateStr: validityDateStr,
+            isExpired: isExpired,
+          ),
         );
       },
     );
@@ -68,7 +78,10 @@ class _TrialDialogState extends State<TrialDialog> {
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF045435);
+    const alertRed = Color(0xFFDC2626);
     const goldColor = Color(0xFFEAB308);
+
+    final isExpired = widget.isExpired;
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -87,35 +100,36 @@ class _TrialDialogState extends State<TrialDialog> {
               children: [
                 const SizedBox(height: 12),
 
-                // Top Badge with Star Burst Confetti Accents
+                // Top Badge Accent
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    const SizedBox(
-                      width: 140,
-                      height: 90,
-                      child: Stack(
-                        children: [
-                          Positioned(top: 10, left: 10, child: Icon(Icons.star_rate_rounded, color: Color(0xFF86EFAC), size: 14)),
-                          Positioned(top: 30, right: 12, child: Icon(Icons.star_rate_rounded, color: Color(0xFFFDE047), size: 16)),
-                          Positioned(bottom: 12, left: 20, child: Icon(Icons.circle, color: Color(0xFFFACC15), size: 8)),
-                          Positioned(bottom: 20, right: 24, child: Icon(Icons.star_rate_rounded, color: Color(0xFF86EFAC), size: 18)),
-                        ],
+                    if (!isExpired)
+                      const SizedBox(
+                        width: 140,
+                        height: 90,
+                        child: Stack(
+                          children: [
+                            Positioned(top: 10, left: 10, child: Icon(Icons.star_rate_rounded, color: Color(0xFF86EFAC), size: 14)),
+                            Positioned(top: 30, right: 12, child: Icon(Icons.star_rate_rounded, color: Color(0xFFFDE047), size: 16)),
+                            Positioned(bottom: 12, left: 20, child: Icon(Icons.circle, color: Color(0xFFFACC15), size: 8)),
+                            Positioned(bottom: 20, right: 24, child: Icon(Icons.star_rate_rounded, color: Color(0xFF86EFAC), size: 18)),
+                          ],
+                        ),
                       ),
-                    ),
 
-                    // Scalloped Badge Circle
+                    // Badge Circle
                     Container(
                       width: 76,
                       height: 76,
-                      decoration: const BoxDecoration(
-                        color: primaryGreen,
+                      decoration: BoxDecoration(
+                        color: isExpired ? alertRed : primaryGreen,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Color(0x33045435),
+                            color: (isExpired ? alertRed : primaryGreen).withValues(alpha: 0.2),
                             blurRadius: 12,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -127,10 +141,10 @@ class _TrialDialogState extends State<TrialDialog> {
                             color: Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: goldColor,
-                            size: 30,
+                          child: Icon(
+                            isExpired ? Icons.lock_clock_rounded : Icons.check_rounded,
+                            color: isExpired ? alertRed : goldColor,
+                            size: 28,
                           ),
                         ),
                       ),
@@ -141,39 +155,50 @@ class _TrialDialogState extends State<TrialDialog> {
                 const SizedBox(height: 16),
 
                 // Title
-                const Text(
-                  'Your Free Trial is Active!',
+                Text(
+                  isExpired ? 'Your Trial Has Expired!' : 'Your Free Trial is Active!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: primaryGreen,
+                    color: isExpired ? alertRed : primaryGreen,
                   ),
                 ),
                 const SizedBox(height: 8),
 
                 // Subtitle
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: const TextStyle(
+                if (isExpired)
+                  const Text(
+                    'Your validity period has ended.\nPlease upgrade to Premium to continue using the app.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF64748B),
                       height: 1.3,
                     ),
-                    children: [
-                      const TextSpan(text: 'You have '),
-                      TextSpan(
-                        text: '${widget.daysRemaining} days',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: primaryGreen,
-                        ),
+                  )
+                else
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                        height: 1.3,
                       ),
-                      const TextSpan(text: ' remaining in your\ntrial period.'),
-                    ],
+                      children: [
+                        const TextSpan(text: 'You have '),
+                        TextSpan(
+                          text: '${widget.daysRemaining} days',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: primaryGreen,
+                          ),
+                        ),
+                        const TextSpan(text: ' remaining in your\ntrial period.'),
+                      ],
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: 20),
 
@@ -186,20 +211,20 @@ class _TrialDialogState extends State<TrialDialog> {
                   ),
                   child: Column(
                     children: [
-                      // Row 1: Trial Ends On
+                      // Row 1: Validity Date
                       Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFECFDF5),
+                              decoration: BoxDecoration(
+                                color: isExpired ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.calendar_today_outlined,
-                                color: Color(0xFF059669),
+                                color: isExpired ? alertRed : const Color(0xFF059669),
                                 size: 20,
                               ),
                             ),
@@ -207,17 +232,17 @@ class _TrialDialogState extends State<TrialDialog> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Trial Ends On',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                                Text(
+                                  isExpired ? 'Validity Expired On' : 'Trial Ends On',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   _formattedValidity,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: primaryGreen,
+                                    color: isExpired ? alertRed : primaryGreen,
                                   ),
                                 ),
                               ],
@@ -228,20 +253,20 @@ class _TrialDialogState extends State<TrialDialog> {
 
                       const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-                      // Row 2: Days Remaining
+                      // Row 2: Days Remaining / Status
                       Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFECFDF5),
+                              decoration: BoxDecoration(
+                                color: isExpired ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.access_time_rounded,
-                                color: Color(0xFF059669),
+                              child: Icon(
+                                isExpired ? Icons.error_outline_rounded : Icons.access_time_rounded,
+                                color: isExpired ? alertRed : const Color(0xFF059669),
                                 size: 20,
                               ),
                             ),
@@ -250,16 +275,16 @@ class _TrialDialogState extends State<TrialDialog> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Days Remaining',
+                                  'Status',
                                   style: TextStyle(fontSize: 11, color: Colors.grey),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${widget.daysRemaining} days',
-                                  style: const TextStyle(
+                                  isExpired ? 'Expired (0 Days)' : '${widget.daysRemaining} days remaining',
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: primaryGreen,
+                                    color: isExpired ? alertRed : primaryGreen,
                                   ),
                                 ),
                               ],
@@ -273,13 +298,13 @@ class _TrialDialogState extends State<TrialDialog> {
 
                 const SizedBox(height: 24),
 
-                // Primary Button: Explore Premium Features
+                // Primary Button: Upgrade Now
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
+                      backgroundColor: isExpired ? alertRed : primaryGreen,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -287,17 +312,19 @@ class _TrialDialogState extends State<TrialDialog> {
                       ),
                     ),
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      if (!isExpired) {
+                        Navigator.of(context).pop();
+                      }
                       context.push('/subscription');
                     },
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.workspace_premium_rounded, color: Color(0xFFFBBF24), size: 20),
-                        SizedBox(width: 8),
+                        const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFBBF24), size: 20),
+                        const SizedBox(width: 8),
                         Text(
-                          'Explore Premium Features',
-                          style: TextStyle(
+                          isExpired ? 'Upgrade Now' : 'Explore Premium Features',
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
@@ -307,56 +334,58 @@ class _TrialDialogState extends State<TrialDialog> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
-
-                // Secondary Button: Maybe Later
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: primaryGreen, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                // Secondary Button: Maybe Later (Only shown if NOT expired)
+                if (!isExpired) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: primaryGreen, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      'Maybe Later',
-                      style: TextStyle(
-                        color: primaryGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text(
+                        'Maybe Later',
+                        style: TextStyle(
+                          color: primaryGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
 
-          // Top Right Close X Button
-          Positioned(
-            top: 12,
-            right: 12,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F5F9),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.close_rounded,
-                  size: 18,
-                  color: Color(0xFF64748B),
+          // Top Right Close X Button (Only shown if NOT expired)
+          if (!isExpired)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

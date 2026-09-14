@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' as drift;
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/catalog_builder_provider.dart';
+import '../../services/analytics_service.dart';
 
 class CatalogStyleSelectScreen extends ConsumerStatefulWidget {
   const CatalogStyleSelectScreen({super.key});
@@ -39,8 +40,9 @@ class _CatalogStyleSelectScreenState extends ConsumerState<CatalogStyleSelectScr
       }
 
       // 3. Create catalog entry in database
+      final catalogName = builderState.name.isEmpty ? 'My Catalog' : builderState.name;
       final companion = CatalogsCompanion(
-        name: drift.Value(builderState.name.isEmpty ? 'My Catalog' : builderState.name),
+        name: drift.Value(catalogName),
         type: drift.Value(builderState.type),
         styleId: drift.Value(builderState.styleId),
       );
@@ -48,6 +50,15 @@ class _CatalogStyleSelectScreenState extends ConsumerState<CatalogStyleSelectScr
       final catalogId = await catalogRepo.addCatalog(companion);
       final prodIds = selectedProducts.map((p) => p.id).toList();
       await catalogRepo.setCatalogProducts(catalogId, prodIds);
+
+      // Firebase Analytics logging
+      AnalyticsService.instance.logCatalogCreated(catalogName: catalogName);
+      for (final p in selectedProducts) {
+        AnalyticsService.instance.logItemAdded(
+          catalogId: catalogId.toString(),
+          itemName: p.name,
+        );
+      }
 
       ref.invalidate(catalogsProvider);
 

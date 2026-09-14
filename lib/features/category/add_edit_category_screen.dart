@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
+import '../../services/analytics_service.dart';
 
 class AddEditCategoryScreen extends ConsumerStatefulWidget {
   final Category? category;
@@ -33,6 +34,10 @@ class _AddEditCategoryScreenState extends ConsumerState<AddEditCategoryScreen> {
     if (widget.category != null) {
       _nameController.text = widget.category!.name;
       _nameLength = widget.category!.name.length;
+      AnalyticsService.instance.logCategoryViewed(
+        categoryId: widget.category!.id.toString(),
+        categoryName: widget.category!.name,
+      );
     }
     _nameController.addListener(() {
       setState(() => _nameLength = _nameController.text.length);
@@ -81,6 +86,7 @@ class _AddEditCategoryScreenState extends ConsumerState<AddEditCategoryScreen> {
             sortOrder: drift.Value(currentSortOrder),
           );
           await repo.addCategory(companion);
+          AnalyticsService.instance.logCategoryCreated(categoryName: catName);
           currentSortOrder++;
         }
       }

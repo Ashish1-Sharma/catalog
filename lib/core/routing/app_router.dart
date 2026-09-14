@@ -33,21 +33,8 @@ class MainShellLayout extends StatelessWidget {
   });
 
   int _calculateSelectedIndex(String path) {
-    if (path.startsWith('/product') ||
-        path.startsWith('/add-product') ||
-        path.startsWith('/edit-product') ||
-        path.startsWith('/category') ||
-        path.startsWith('/add-category') ||
-        path.startsWith('/edit-category')) {
+    if (path.startsWith('/catalog-list')) {
       return 1;
-    }
-    if (path.startsWith('/catalog') || path.startsWith('/export-share')) {
-      return 2;
-    }
-    if (path.startsWith('/settings') ||
-        path.startsWith('/edit-business') ||
-        path.startsWith('/subscription')) {
-      return 3;
     }
     return 0;
   }
@@ -56,11 +43,7 @@ class MainShellLayout extends StatelessWidget {
     if (index == 0) {
       context.go('/dashboard');
     } else if (index == 1) {
-      context.go('/product-list');
-    } else if (index == 2) {
       context.go('/catalog-list');
-    } else if (index == 3) {
-      context.go('/settings');
     }
   }
 
@@ -96,19 +79,9 @@ class MainShellLayout extends StatelessWidget {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.inventory_2_rounded, color: primaryGreen, size: 24),
-              label: 'Products',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.menu_book_rounded, color: primaryGreen, size: 24),
+              icon: Icon(Icons.folder_open_outlined, color: Color(0xFF64748B), size: 24),
+              selectedIcon: Icon(Icons.folder_rounded, color: primaryGreen, size: 24),
               label: 'Catalogs',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.settings_rounded, color: primaryGreen, size: 24),
-              label: 'Settings',
             ),
           ],
         ),
@@ -149,91 +122,91 @@ final appRouter = GoRouter(
           builder: (context, state) => const DashboardScreen(),
         ),
         GoRoute(
-          path: '/category-list',
-          builder: (context, state) => const CategoryListScreen(),
-        ),
-        GoRoute(
-          path: '/add-category',
-          builder: (context, state) => const AddEditCategoryScreen(),
-        ),
-        GoRoute(
-          path: '/edit-category',
-          builder: (context, state) {
-            final category = state.extra as Category?;
-            return AddEditCategoryScreen(category: category);
-          },
-        ),
-        GoRoute(
-          path: '/product-list',
-          builder: (context, state) => const ProductListScreen(),
-        ),
-        GoRoute(
-          path: '/add-product',
-          builder: (context, state) => const AddEditProductScreen(),
-        ),
-        GoRoute(
-          path: '/edit-product',
-          builder: (context, state) {
-            final product = state.extra as Product?;
-            return AddEditProductScreen(product: product);
-          },
-        ),
-        GoRoute(
           path: '/catalog-list',
           builder: (context, state) => const CatalogListScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-step1',
-          builder: (context, state) => const CatalogCategorySelectScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-step2',
-          builder: (context, state) => const CatalogProductSelectScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-step3',
-          builder: (context, state) => const CatalogTypeSelectScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-step4',
-          builder: (context, state) => const CatalogStyleSelectScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-step4-list',
-          builder: (context, state) => const CatalogListStyleSelectScreen(),
-        ),
-        GoRoute(
-          path: '/catalog-preview',
-          builder: (context, state) => const CatalogPreviewScreen(),
-        ),
-        GoRoute(
-          path: '/export-share',
-          builder: (context, state) {
-            final catalog = state.extra as Catalog;
-            return ExportShareScreen(catalog: catalog);
-          },
-        ),
-        GoRoute(
-          path: '/subscription',
-          builder: (context, state) => const SubscriptionScreen(),
         ),
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
         ),
-        GoRoute(
-          path: '/edit-business-profile',
-          builder: (context, state) => const BusinessProfileScreen(isEdit: true),
-        ),
-        GoRoute(
-          path: '/marketing',
-          builder: (context, state) => const MarketingScreen(),
-        ),
-        GoRoute(
-          path: '/tutorial',
-          builder: (context, state) => const TutorialScreen(),
-        ),
       ],
+    ),
+    GoRoute(
+      path: '/category-list',
+      builder: (context, state) => const CategoryListScreen(),
+    ),
+    GoRoute(
+      path: '/add-category',
+      builder: (context, state) => const AddEditCategoryScreen(),
+    ),
+    GoRoute(
+      path: '/edit-category',
+      builder: (context, state) {
+        final category = state.extra as Category?;
+        return AddEditCategoryScreen(category: category);
+      },
+    ),
+    GoRoute(
+      path: '/product-list',
+      builder: (context, state) => const ProductListScreen(),
+    ),
+    GoRoute(
+      path: '/add-product',
+      builder: (context, state) => const AddEditProductScreen(),
+    ),
+    GoRoute(
+      path: '/edit-product',
+      builder: (context, state) {
+        final product = state.extra as Product?;
+        return AddEditProductScreen(product: product);
+      },
+    ),
+    GoRoute(
+      path: '/catalog-step1',
+      builder: (context, state) => const CatalogCategorySelectScreen(),
+    ),
+    GoRoute(
+      path: '/catalog-step2',
+      builder: (context, state) => const CatalogProductSelectScreen(),
+    ),
+    GoRoute(
+      path: '/catalog-step3',
+      builder: (context, state) => const CatalogTypeSelectScreen(),
+    ),
+    GoRoute(
+      path: '/catalog-step4',
+      builder: (context, state) => const CatalogStyleSelectScreen(),
+    ),
+    GoRoute(
+      path: '/catalog-step4-list',
+      builder: (context, state) => const CatalogListStyleSelectScreen(),
+    ),
+    GoRoute(
+      path: '/catalog-preview',
+      builder: (context, state) => const CatalogPreviewScreen(),
+    ),
+    GoRoute(
+      path: '/export-share',
+      builder: (context, state) {
+        final catalog = state.extra as Catalog;
+        return ExportShareScreen(catalog: catalog);
+      },
+    ),
+    GoRoute(
+      path: '/subscription',
+      builder: (context, state) => const SubscriptionScreen(),
+    ),
+    GoRoute(
+      path: '/edit-business-profile',
+      builder: (context, state) => const BusinessProfileScreen(isEdit: true),
+    ),
+    GoRoute(
+      path: '/marketing',
+      builder: (context, state) => const MarketingScreen(),
+    ),
+    GoRoute(
+      path: '/tutorial',
+      builder: (context, state) => const TutorialScreen(),
     ),
   ],
 );

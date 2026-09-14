@@ -14,6 +14,19 @@ class AppDateUtils {
     }
   }
 
+  static bool isExpired(String? validityDateStr) {
+    if (validityDateStr == null || validityDateStr.isEmpty) return true;
+    try {
+      final validityDate = DateTime.parse(validityDateStr);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(validityDate.year, validityDate.month, validityDate.day);
+      return today.isAfter(target) || today.isAtSameMomentAs(target);
+    } catch (_) {
+      return true;
+    }
+  }
+
   static String formatDate(DateTime dateTime) {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
   }

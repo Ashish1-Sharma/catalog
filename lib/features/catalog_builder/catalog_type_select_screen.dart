@@ -22,27 +22,13 @@ class CatalogTypeSelectScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_rounded, color: primaryPurple),
           onPressed: () => context.pop(),
         ),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Create Catalog',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              'Step 3 of 3',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Select Layout Type',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         actions: [
           IconButton(
@@ -60,10 +46,6 @@ class CatalogTypeSelectScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 3-Step Stepper Header Indicator Bar
-            _buildStepperHeader(),
-
-            const SizedBox(height: 24),
 
             // Section Header
             const Text(
@@ -256,110 +238,6 @@ class CatalogTypeSelectScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStepperHeader() {
-    const activeColor = Color(0xFF6366F1);
-
-    return Row(
-      children: [
-        // Step 1 Completed
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Categories',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 1-2 (Active Purple)
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: activeColor,
-          ),
-        ),
-
-        // Step 2 Completed
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select Products',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-
-        // Line 2-3 (Active Purple)
-        Expanded(
-          child: Container(
-            height: 2,
-            margin: const EdgeInsets.only(bottom: 20),
-            color: activeColor,
-          ),
-        ),
-
-        // Step 3 Active
-        Expanded(
-          child: Column(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '3',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Layout Type',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: activeColor),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

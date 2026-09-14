@@ -8,6 +8,7 @@ import '../../core/widgets/primary_button.dart';
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/catalog_builder_provider.dart';
+import '../../services/analytics_service.dart';
 
 class CatalogPreviewScreen extends ConsumerStatefulWidget {
   const CatalogPreviewScreen({super.key});
@@ -24,8 +25,9 @@ class _CatalogPreviewScreenState extends ConsumerState<CatalogPreviewScreen> {
     final builderState = ref.read(catalogBuilderProvider);
     final catalogRepo = ref.read(catalogRepoProvider);
 
+    final catalogName = builderState.name.isEmpty ? 'My Catalog' : builderState.name;
     final companion = CatalogsCompanion(
-      name: drift.Value(builderState.name.isEmpty ? 'My Catalog' : builderState.name),
+      name: drift.Value(catalogName),
       type: drift.Value(builderState.type),
       styleId: drift.Value(builderState.styleId),
     );
@@ -33,6 +35,15 @@ class _CatalogPreviewScreenState extends ConsumerState<CatalogPreviewScreen> {
     final catalogId = await catalogRepo.addCatalog(companion);
     final prodIds = selectedProducts.map((p) => p.id).toList();
     await catalogRepo.setCatalogProducts(catalogId, prodIds);
+
+    // Firebase Analytics logging
+    AnalyticsService.instance.logCatalogCreated(catalogName: catalogName);
+    for (final p in selectedProducts) {
+      AnalyticsService.instance.logItemAdded(
+        catalogId: catalogId.toString(),
+        itemName: p.name,
+      );
+    }
 
     ref.invalidate(catalogsProvider);
 

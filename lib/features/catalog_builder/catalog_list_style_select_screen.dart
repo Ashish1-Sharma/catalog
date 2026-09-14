@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' as drift;
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/catalog_builder_provider.dart';
+import '../../services/analytics_service.dart';
 
 class CatalogListStyleSelectScreen extends ConsumerStatefulWidget {
   const CatalogListStyleSelectScreen({super.key});
@@ -18,20 +19,15 @@ class _CatalogListStyleSelectScreenState extends ConsumerState<CatalogListStyleS
 
   Future<void> _generateAndSaveCatalog() async {
     setState(() => _isSaving = true);
+    final builderState = ref.read(catalogBuilderProvider);
+    final catalogRepo = ref.read(catalogRepoProvider);
+    final allProducts = (await ref.read(productsProvider.future));
+
     try {
-      final builderState = ref.read(catalogBuilderProvider);
-      final catalogRepo = ref.read(catalogRepoProvider);
-      final productRepo = ref.read(productRepoProvider);
-
-      // 1. Fetch all products
-      final allProducts = await productRepo.getProducts();
-
-      // 2. Resolve selected products
       List<Product> selectedProducts = [];
       if (builderState.selectedProductIds.isNotEmpty) {
         selectedProducts = allProducts.where((p) => builderState.selectedProductIds.contains(p.id)).toList();
-      }
-      if (selectedProducts.isEmpty && builderState.selectedCategoryIds.isNotEmpty) {
+      } else if (builderState.selectedCategoryIds.isNotEmpty) {
         selectedProducts = allProducts.where((p) => builderState.selectedCategoryIds.contains(p.categoryId)).toList();
       }
       if (selectedProducts.isEmpty) {
@@ -39,8 +35,9 @@ class _CatalogListStyleSelectScreenState extends ConsumerState<CatalogListStyleS
       }
 
       // 3. Create list catalog entry in database
+      final catalogName = builderState.name.isEmpty ? 'My List Catalog' : builderState.name;
       final companion = CatalogsCompanion(
-        name: drift.Value(builderState.name.isEmpty ? 'My List Catalog' : builderState.name),
+        name: drift.Value(catalogName),
         type: const drift.Value('list'),
         styleId: drift.Value(builderState.styleId),
       );
@@ -48,6 +45,15 @@ class _CatalogListStyleSelectScreenState extends ConsumerState<CatalogListStyleS
       final catalogId = await catalogRepo.addCatalog(companion);
       final prodIds = selectedProducts.map((p) => p.id).toList();
       await catalogRepo.setCatalogProducts(catalogId, prodIds);
+
+      // Firebase Analytics logging
+      AnalyticsService.instance.logCatalogCreated(catalogName: catalogName);
+      for (final p in selectedProducts) {
+        AnalyticsService.instance.logItemAdded(
+          catalogId: catalogId.toString(),
+          itemName: p.name,
+        );
+      }
 
       ref.invalidate(catalogsProvider);
 

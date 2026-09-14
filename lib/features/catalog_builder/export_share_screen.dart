@@ -2,12 +2,14 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 import '../../core/services/image_export_service.dart';
 import '../../core/services/pdf_export_service.dart';
 import '../../core/services/product_image_service.dart';
 import '../../data/database/app_database.dart';
 import '../../providers/app_providers.dart';
+import '../../services/analytics_service.dart';
 
 class ExportShareScreen extends ConsumerStatefulWidget {
   final Catalog catalog;
@@ -104,6 +106,12 @@ class _ExportShareScreenState extends ConsumerState<ExportShareScreen> {
       final pdf = await _buildPdf();
       final saved =
           await PdfExportService.savePdfToDevice(pdf, widget.catalog.name);
+
+      AnalyticsService.instance.logCatalogExported(
+        catalogId: widget.catalog.id.toString(),
+        format: 'pdf',
+      );
+
       if (!mounted) return;
       setState(() => _isBusy = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -130,6 +138,12 @@ class _ExportShareScreenState extends ConsumerState<ExportShareScreen> {
     setState(() => _isBusy = true);
     try {
       final pdf = await _buildPdf();
+
+      AnalyticsService.instance.logCatalogShared(
+        catalogId: widget.catalog.id.toString(),
+        method: 'pdf',
+      );
+
       if (!mounted) return;
       setState(() => _isBusy = false);
       await ImageExportService.shareFile(
@@ -186,9 +200,11 @@ class _ExportShareScreenState extends ConsumerState<ExportShareScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: _primaryPurple),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.home_rounded, color: _primaryPurple, size: 24),
+          onPressed: () => context.go('/dashboard'),
+          tooltip: 'Home',
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,52 +410,78 @@ class _ExportShareScreenState extends ConsumerState<ExportShareScreen> {
         top: false,
         child: Row(
           children: [
+            // Download PDF
             Expanded(
               child: SizedBox(
-                height: 50,
+                height: 48,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _deepPurple,
                     side: const BorderSide(color: _deepPurple, width: 1.5),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   onPressed: _isBusy ? null : _downloadPdf,
-                  icon: const Icon(Icons.download_rounded, size: 20),
+                  icon: const Icon(Icons.download_rounded, size: 18),
                   label: const Text(
-                    'Download PDF',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    'Download',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+
+            // Share Catalog
             Expanded(
               child: SizedBox(
-                height: 50,
+                height: 48,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _deepPurple,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   onPressed: _isBusy ? null : _sharePdf,
                   icon: _isBusy
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
+                          width: 16,
+                          height: 16,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2.2),
                         )
-                      : const Icon(Icons.share_rounded, size: 20),
+                      : const Icon(Icons.share_rounded, size: 18),
                   label: const Text(
-                    'Share Catalog',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    'Share',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                   ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Home Screen Button
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF045435),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => context.go('/dashboard'),
+                icon: const Icon(Icons.home_rounded, size: 18),
+                label: const Text(
+                  'Home',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

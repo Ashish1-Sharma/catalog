@@ -19,10 +19,14 @@ android {
 
     defaultConfig {
         applicationId = "com.ashish.qr_scanner"
-        minSdk = flutter.minSdkVersion
+        minSdk = 21
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        ndk {
+            abiFilters.addAll(setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
     }
 
     java {
@@ -52,13 +56,12 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
-            // Uncomment below if you want proguard enabled
-            // proguardFiles(
-            //     getDefaultProguardFile("proguard-android.txt"),
-            //     "proguard-rules.pro"
-            // )
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         getByName("debug") {
             // Don't use the release/upload keystore for debug
@@ -69,3 +72,12 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.google.android.play:feature-delivery:2.1.0")
+    implementation("com.google.android.play:feature-delivery-ktx:2.1.0")
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:review:2.0.1")
+    implementation("com.android.billingclient:billing-ktx:8.0.0")
+}
+

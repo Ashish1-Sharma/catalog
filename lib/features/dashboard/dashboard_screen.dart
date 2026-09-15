@@ -134,8 +134,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          const SizedBox(width: 4),
+        actions: const [
+          SizedBox(width: 4),
         ],
       ),
       drawer: Drawer(

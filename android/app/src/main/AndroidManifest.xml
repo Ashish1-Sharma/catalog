@@ -6,6 +6,13 @@
          Android 10+ uses scoped storage and does not need this. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
+    <!-- Prevent Play Store hardware requirement filtering for dropped devices -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+
     <application
         android:label="Catalog Maker"
         android:name="${applicationName}"

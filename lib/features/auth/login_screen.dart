@@ -1,3 +1,4 @@
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _mobileController = TextEditingController();
   
+  Country _selectedCountry = Country.parse('IN');
   bool _isRegisterMode = true; // Defaults to Register Mode as shown in design
   bool _isLoading = false;
   String? _errorMessage;
@@ -44,6 +46,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final mobile = _mobileController.text.trim();
+    final countryCode = '+${_selectedCountry.phoneCode}';
+    final country = _selectedCountry.name;
 
     ApiResponse response;
 
@@ -53,6 +57,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         userName: name.isNotEmpty ? name : 'User',
         userEmail: email,
         userMobile: mobile,
+        countryCode: countryCode,
+        country: country,
       );
       // Fallback to login if already exists
       if (!response.isSuccess &&
@@ -77,6 +83,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           userName: name.isNotEmpty ? name : 'User',
           userEmail: email,
           userMobile: mobile,
+          countryCode: countryCode,
+          country: country,
         );
       }
     }
@@ -322,29 +330,83 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       const Icon(Icons.phone_outlined, color: primaryGreen, size: 22),
                       const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('🇮🇳', style: TextStyle(fontSize: 14)),
-                            SizedBox(width: 4),
-                            Text(
-                              '+91',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
+                      InkWell(
+                        onTap: () {
+                          showCountryPicker(
+                            context: context,
+                            showPhoneCode: true,
+                            countryListTheme: CountryListThemeData(
+                              backgroundColor: Colors.white,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(24),
+                                topRight: Radius.circular(24),
+                              ),
+                              bottomSheetHeight: MediaQuery.of(context).size.height * 0.75,
+                              flagSize: 24,
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0F172A),
+                              ),
+                              searchTextStyle: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              inputDecoration: InputDecoration(
+                                hintText: 'Search country or code...',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                prefixIcon: const Icon(Icons.search_rounded, color: primaryGreen, size: 20),
+                                fillColor: const Color(0xFFF8FAFC),
+                                filled: true,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: primaryGreen, width: 2),
+                                ),
                               ),
                             ),
-                            SizedBox(width: 2),
-                            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Colors.grey),
-                          ],
+                            onSelect: (Country country) {
+                              setState(() {
+                                _selectedCountry = country;
+                              });
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_selectedCountry.flagEmoji, style: const TextStyle(fontSize: 14)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '+${_selectedCountry.phoneCode}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Colors.grey),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
